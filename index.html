@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Seven C — Task Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+
+<style>
+  /* ===== RESET & BASE ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  :root {
+    --bg:        #0a0a0f;
+    --surface:   #111118;
+    --surface2:  #18181f;
+    --border:    rgba(255,255,255,0.07);
+    --border2:   rgba(255,255,255,0.12);
+    --text:      #e8e8f0;
+    --text-dim:  #7a7a8c;
+    --text-muted:#4a4a5a;
+    --accent:    #ff5c35;
+    --accent2:   #ff8c6b;
+    --todo:      #3b7ff5;
+    --doing:     #f5a623;
+    --done:      #3ecf8e;
+    --standby:   #8b5cf6;
+    --overdue:   #ff3b3b;
+    --recorrente:#06b6d4;
+    --font-head: 'Syne', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+    --radius:    12px;
+    --radius-lg: 20px;
+    --shadow:    0 4px 24px rgba(0,0,0,0.4);
+    --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-body); }
+  #root { height: 100%; }
+
+  /* ===== SCROLLBAR ===== */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+
+  /* ===== LAYOUT ===== */
+  .app { display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* ===== HEADER ===== */
+  .header {
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: linear-gradient(180deg, rgba(255,92,53,0.05) 0%, transparent 100%);
+    position: sticky; top: 0; z-index: 100;
+    backdrop-filter: blur(20px);
+  }
+  .logo {
+    font-family: var(--font-head);
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--text);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+  .header-stats { display: flex; gap: 24px; margin-left: auto; }
+  .stat-chip {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .stat-chip span { color: var(--text); font-weight: 600; font-size: 14px; }
+  .stat-chip.overdue span { color: var(--overdue); }
+
+  /* ===== TOOLBAR ===== */
+  .toolbar {
+    padding: 16px 32px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+  }
+  .search-input {
+    flex: 1; min-width: 200px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 16px;
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    outline: none;
+    transition: var(--transition);
+  }
+  .search-input:focus { border-color: var(--border2); background: var(--surface2); }
+  .search-input::placeholder { color: var(--text-muted); }
+
+  .filter-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill {
+    padding: 7px 14px; border-radius: 99px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-family: var(--font-body);
+    font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: var(--transition);
+    white-space: nowrap;
+  }
+  .pill:hover { border-color: var(--border2); color: var(--text); }
+  .pill.active { background: var(--accent); border-color: var(--accent); color: white; }
+  .pill.todo.active    { background: var(--todo); border-color: var(--todo); }
+  .pill.doing.active   { background: var(--doing); border-color: var(--doing); color: #111; }
+  .pill.done.active    { background: var(--done); border-color: var(--done); color: #111; }
+  .pill.standby.active { background: var(--standby); border-color: var(--standby); }
+  .pill.overdue.active { background: var(--overdue); border-color: var(--overdue); }
+
+  .btn {
+    padding: 9px 18px; border-radius: var(--radius);
+    border: none; cursor: pointer;
+    font-family: var(--font-body); font-size: 13px; font-weight: 500;
+    transition: var(--transition); display: flex; align-items: center; gap: 8px;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: var(--accent2); transform: translateY(-1px); }
+  .btn-ghost { background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--border2); }
+  .btn-danger { background: rgba(255,59,59,0.15); color: var(--overdue); border: 1px solid rgba(255,59,59,0.2); }
+  .btn-danger:hover { background: rgba(255,59,59,0.25); }
+
+  /* ===== VIEWS ===== */
+  .main { flex: 1; padding: 24px 32px; }
+  .view-toggle { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 3px; }
+  .view-btn { padding: 6px 12px; border-radius: 8px; border: none; background: transparent; color: var(--text-dim); cursor: pointer; font-size: 14px; transition: var(--transition); }
+  .view-btn.active { background: var(--surface2); color: var(--text); }
+
+  /* ===== KANBAN ===== */
+  .kanban { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 16px; }
+  .kanban-col {
+    min-width: 300px; flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .col-header {
+    display: flex; align-items: center; gap: 10px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+  .col-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .col-title { font-family: var(--font-head); font-size: 14px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+  .col-count {
+    margin-left: auto; background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 99px; padding: 2px 10px;
+    font-size: 11px; color: var(--text-dim); font-weight: 600;
+  }
+
+  /* ===== CARDS ===== */
+  .task-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+  }
+  .task-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    opacity: 0; transition: var(--transition);
+  }
+  .task-card:hover { border-color: var(--border2); transform: translateY(-2px); box-shadow: var(--shadow); }
+  .task-card:hover::before { opacity: 1; }
+  .task-card.overdue { border-color: rgba(255,59,59,0.3); }
+  .task-card.overdue::before { background: var(--overdue); opacity: 1; }
+
+  .card-project { font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
+  .card-name { font-size: 14px; font-weight: 500; line-height: 1.4; margin-bottom: 10px; }
+  .card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card-date { font-size: 11px; color: var(--text-dim); }
+  .card-date.overdue { color: var(--overdue); font-weight: 600; }
+  .card-date.today { color: var(--doing); font-weight: 600; }
+  .priority-badge {
+    font-size: 10px; padding: 2px 8px; border-radius: 99px;
+    font-weight: 600; letter-spacing: 0.3px;
+  }
+  .priority-critico  { background: rgba(255,59,59,0.15); color: #ff6b6b; }
+  .priority-importante { background: rgba(245,166,35,0.15); color: #f5a623; }
+  .priority-normal   { background: rgba(255,255,255,0.06); color: var(--text-dim); }
+
+  .subtask-progress { margin-top: 10px; }
+  .progress-bar { height: 3px; background: var(--border); border-radius: 99px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 99px; background: var(--done); transition: width 0.4s; }
+  .progress-label { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+
+  /* ===== LIST VIEW ===== */
+  .list-view { display: flex; flex-direction: column; gap: 0; }
+  .list-header {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr 100px;
+    gap: 16px; padding: 10px 16px;
+    font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .list-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr 100px;
+    gap: 16px; padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+    cursor: pointer; transition: var(--transition);
+    font-size: 13px;
+  }
+  .list-row:hover { background: var(--surface); }
+  .list-row.overdue { background: rgba(255,59,59,0.04); }
+
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 600;
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .status-Todo    { background: rgba(59,127,245,0.15); color: #5b9fff; }
+  .status-Doing   { background: rgba(245,166,35,0.15); color: #f5a623; }
+  .status-Done    { background: rgba(62,207,142,0.15); color: #3ecf8e; }
+  .status-StandBy { background: rgba(139,92,246,0.15); color: #a78bfa; }
+  .status-Recorrente { background: rgba(6,182,212,0.15); color: #06b6d4; }
+
+  /* ===== MODAL ===== */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-lg);
+    width: 100%; max-width: 560px;
+    max-height: 85vh; overflow-y: auto;
+    padding: 28px;
+    animation: slideUp 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  }
+  @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+
+  .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+  .modal-title { font-family: var(--font-head); font-size: 20px; font-weight: 700; }
+  .modal-close { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-dim); font-size: 18px; transition: var(--transition); }
+  .modal-close:hover { color: var(--text); border-color: var(--border2); }
+
+  .form-grid { display: flex; flex-direction: column; gap: 16px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-label { font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-muted); }
+  .form-input, .form-select {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 14px;
+    color: var(--text); font-family: var(--font-body); font-size: 14px;
+    outline: none; transition: var(--transition); width: 100%;
+  }
+  .form-input:focus, .form-select:focus { border-color: var(--accent); }
+  .form-select option { background: var(--surface2); }
+
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+
+  /* ===== TASK DETAIL ===== */
+  .detail-field { margin-bottom: 16px; }
+  .detail-label { font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; }
+  .detail-value { font-size: 14px; color: var(--text); }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+
+  .subtasks-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .subtask-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: 13px;
+  }
+  .subtask-item.done { color: var(--text-muted); text-decoration: line-through; }
+  .check-icon { color: var(--done); font-size: 14px; }
+  .uncheck-icon { color: var(--text-muted); font-size: 14px; }
+
+  .notion-link { color: var(--accent); text-decoration: none; font-size: 12px; }
+  .notion-link:hover { text-decoration: underline; }
+
+  /* ===== EMPTY STATE ===== */
+  .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: var(--text-muted); gap: 12px; }
+  .empty-icon { font-size: 40px; opacity: 0.4; }
+  .empty-text { font-size: 14px; }
+
+  /* ===== LOADING ===== */
+  .loading { display: flex; align-items: center; justify-content: center; padding: 60px; }
+  .spinner { width: 32px; height: 32px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ===== TOAST ===== */
+  .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: var(--radius); padding: 12px 18px;
+    font-size: 13px; box-shadow: var(--shadow);
+    animation: slideUp 0.2s ease;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .toast.success { border-color: rgba(62,207,142,0.3); }
+  .toast.error   { border-color: rgba(255,59,59,0.3); }
+
+  /* ===== CONFIG PANEL ===== */
+  .config-banner {
+    background: rgba(255,92,53,0.08); border: 1px solid rgba(255,92,53,0.2);
+    border-radius: var(--radius); padding: 16px 20px;
+    margin-bottom: 20px; display: flex; align-items: center; gap: 12px;
+    font-size: 13px; color: var(--text-dim);
+  }
+  .config-banner strong { color: var(--accent); }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 768px) {
+    .header { padding: 14px 16px; }
+    .main { padding: 16px; }
+    .toolbar { padding: 12px 16px; }
+    .header-stats { display: none; }
+    .kanban { gap: 14px; }
+    .kanban-col { min-width: 260px; }
+    .list-header { display: none; }
+    .list-row { grid-template-columns: 1fr; }
+    .form-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+
+// ============================================================
+// CONFIG — Edite aqui após deploy do Apps Script
+// ============================================================
+const API_CONFIG = {
+  // Cole aqui a URL do seu Google Apps Script após publicar
+  url: 'https://script.google.com/macros/s/SEU_SCRIPT_ID_AQUI/exec',
+  key: 'sevenC-2026',
+};
+
+// Dados de demo para funcionar sem API configurada
+const DEMO_DATA = [
+  { ID:'demo1', Nome:'BRPark', Projeto:'BRPark', Status:'To Do', Prioridade:'🔴 Crítico', Data:'2026-05-08', Tipo:'Follow-up', Categoria:'Receita', Subtarefas:'Reenviar Proposta|☐,Fechar|☐,Montar proposta|✅' },
+  { ID:'demo2', Nome:'Reestruturação Comercial', Projeto:'Reestruturação Comercial', Status:'To Do', Prioridade:'🔴 Crítico', Data:'2026-05-11', Tipo:'Execução', Categoria:'Receita', Subtarefas:'Alinhamentos - Geral|☐,Apresentação Comissões|☐,Playbook|☐,Material Projeto|✅' },
+  { ID:'demo3', Nome:'Atendimento IC', Projeto:'Atendimento IC', Status:'To Do', Prioridade:'🔴 Crítico', Data:'2026-05-11', Tipo:'Follow-up', Categoria:'Receita', Subtarefas:'Retorno Faturamento Abril|☐,Faturamento efetuado|☐,Validar proposta|✅' },
+  { ID:'demo4', Nome:'Nova Sala', Projeto:'Nova Sala', Status:'To Do', Prioridade:'🔴 Crítico', Data:'2026-05-11', Tipo:'Follow-up', Categoria:'Pessoas/Pessoal', Subtarefas:'Apresentar para DSI opções|☐' },
+  { ID:'demo5', Nome:'Estudo Produtos', Projeto:'Estudo Produtos', Status:'Doing', Prioridade:'🟡 Importante', Data:'2026-05-13', Tipo:'Execução', Categoria:'Produto', Subtarefas:'' },
+  { ID:'demo6', Nome:'MOU - ValeJá', Projeto:'MOU - ValeJá', Status:'To Do', Prioridade:'🔴 Crítico', Data:'2026-05-15', Tipo:'Decisão', Categoria:'Receita', Subtarefas:'Analisar Retorno Fausto|☐' },
+  { ID:'demo7', Nome:'Benefícios', Projeto:'Benefícios', Status:'To Do', Prioridade:'🟡 Importante', Data:'2026-05-12', Tipo:'Execução', Categoria:'Pessoas/Pessoal', Subtarefas:'' },
+  { ID:'demo8', Nome:'Nova eFleet (refatoração)', Projeto:'Nova eFleet', Status:'To Do', Prioridade:'🔴 Crítico', Data:'2026-05-30', Tipo:'Decisão', Categoria:'Produto', Subtarefas:'Definição do prestador|☐,e-mail p/ IONIX|✅' },
+  { ID:'demo9', Nome:'Proposta Vidal', Projeto:'Proposta Vidal', Status:'To Do', Prioridade:'🟡 Importante', Data:'2026-05-30', Tipo:'Execução', Categoria:'Receita', Subtarefas:'Proposta Cliente Pagador|☐' },
+  { ID:'demo10', Nome:'Proposta Edinho - Mahle', Projeto:'Proposta Edinho', Status:'StandBy', Prioridade:'⚪ Normal', Data:'', Tipo:'Execução', Categoria:'Receita', Subtarefas:'' },
+  { ID:'demo11', Nome:'Design Organizacional', Projeto:'Design Organizacional', Status:'StandBy', Prioridade:'⚪ Normal', Data:'', Tipo:'Estratégia', Categoria:'Estratégia', Subtarefas:'' },
+  { ID:'demo12', Nome:'Validar Atendimento Suporte', Projeto:'Suporte', Status:'Done', Prioridade:'🟡 Importante', Data:'2026-05-06', Tipo:'Execução', Categoria:'Receita', Subtarefas:'' },
+  { ID:'demo13', Nome:'Correção Comitê de Preços', Projeto:'Comitê', Status:'Done', Prioridade:'🔴 Crítico', Data:'2026-05-07', Tipo:'Decisão', Categoria:'Financeiro', Subtarefas:'' },
+  { ID:'demo14', Nome:'Atualização Mapa Estratégico', Projeto:'Estratégia', Status:'To Do', Prioridade:'🔴 Crítico', Data:'2026-05-08', Tipo:'Execução', Categoria:'Estratégia', Subtarefas:'' },
+  { ID:'demo15', Nome:'Agenda do Sync', Projeto:'Rotinas', Status:'Recorrente', Prioridade:'⚪ Normal', Data:'2026-05-20', Tipo:'Reunião', Categoria:'Estratégia', Subtarefas:'' },
+];
+
+// ============================================================
+// UTILS
+// ============================================================
+const hoje = new Date(); hoje.setHours(0,0,0,0);
+
+function isOverdue(task) {
+  if (!task.Data || ['Done','StandBy'].includes(task.Status)) return false;
+  return new Date(task.Data) < hoje;
+}
+function isToday(task) {
+  if (!task.Data || ['Done','StandBy'].includes(task.Status)) return false;
+  return new Date(task.Data).toDateString() === hoje.toDateString();
+}
+function formatDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('pt-BR', { day:'2-digit', month:'short' });
+}
+function parseSubtasks(str) {
+  if (!str) return [];
+  return str.split(',').map(s => {
+    const [nome, check] = s.split('|');
+    return { nome: nome?.trim(), done: check?.trim() === '✅' };
+  }).filter(s => s.nome);
+}
+function getPriorityClass(p) {
+  if (!p) return 'normal';
+  if (p.includes('Crítico')) return 'critico';
+  if (p.includes('Importante')) return 'importante';
+  return 'normal';
+}
+
+const STATUS_COLORS = {
+  'To Do':     '#3b7ff5',
+  'Doing':     '#f5a623',
+  'Done':      '#3ecf8e',
+  'StandBy':   '#8b5cf6',
+  'Recorrente':'#06b6d4',
+};
+const STATUS_ORDER = ['To Do','Doing','StandBy','Recorrente','Done'];
+
+// ============================================================
+// API
+// ============================================================
+const isDemo = !API_CONFIG.url.includes('script.google.com/macros/s/') || API_CONFIG.url.includes('SEU_SCRIPT');
+
+async function apiCall(action, params={}, body=null) {
+  if (isDemo) return null; // demo mode
+  const url = new URL(API_CONFIG.url);
+  url.searchParams.set('key', API_CONFIG.key);
+  url.searchParams.set('action', action);
+  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k,v));
+
+  const opts = body
+    ? { method:'POST', body: JSON.stringify(body) }
+    : { method:'GET' };
+
+  const res = await fetch(url.toString(), opts);
+  return res.json();
+}
+
+// ============================================================
+// COMPONENTS
+// ============================================================
+
+function Toast({ toasts }) {
+  return (
+    <div className="toast-container">
+      {toasts.map(t => (
+        <div key={t.id} className={`toast ${t.type}`}>
+          <span>{t.type === 'success' ? '✓' : '✕'}</span>
+          {t.msg}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function StatusBadge({ status }) {
+  const cls = status?.replace(' ','') || 'Todo';
+  return (
+    <span className={`status-badge status-${cls}`}>
+      <span className="status-dot" style={{ background: STATUS_COLORS[status] || '#666' }} />
+      {status || '—'}
+    </span>
+  );
+}
+
+function PriorityBadge({ priority }) {
+  if (!priority) return null;
+  const cls = getPriorityClass(priority);
+  return <span className={`priority-badge priority-${cls}`}>{priority}</span>;
+}
+
+function SubtaskProgress({ subtasks }) {
+  if (!subtasks?.length) return null;
+  const done = subtasks.filter(s => s.done).length;
+  const pct = Math.round((done / subtasks.length) * 100);
+  return (
+    <div className="subtask-progress">
+      <div className="progress-bar">
+        <div className="progress-fill" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="progress-label">{done}/{subtasks.length} subtarefas</div>
+    </div>
+  );
+}
+
+function TaskCard({ task, onClick }) {
+  const subtasks = parseSubtasks(task.Subtarefas);
+  const overdue = isOverdue(task);
+  const today = isToday(task);
+
+  return (
+    <div className={`task-card ${overdue ? 'overdue' : ''}`} onClick={() => onClick(task)}>
+      {task.Projeto && task.Projeto !== task.Nome && (
+        <div className="card-project">{task.Projeto}</div>
+      )}
+      <div className="card-name">{task.Nome}</div>
+      <div className="card-meta">
+        {task.Data && (
+          <div className={`card-date ${overdue ? 'overdue' : today ? 'today' : ''}`}>
+            {overdue ? '⚠ ' : today ? '● ' : ''}{formatDate(task.Data)}
+          </div>
+        )}
+        <PriorityBadge priority={task.Prioridade} />
+        {task.Tipo && <span style={{fontSize:'10px', color:'var(--text-muted)'}}>{task.Tipo}</span>}
+      </div>
+      {subtasks.length > 0 && <SubtaskProgress subtasks={subtasks} />}
+    </div>
+  );
+}
+
+function KanbanView({ tasks, onCardClick }) {
+  return (
+    <div className="kanban">
+      {STATUS_ORDER.map(status => {
+        const col = tasks.filter(t => t.Status === status);
+        const color = STATUS_COLORS[status] || '#666';
+        return (
+          <div key={status} className="kanban-col">
+            <div className="col-header">
+              <div className="col-dot" style={{ background: color }} />
+              <div className="col-title" style={{ color }}>{status}</div>
+              <div className="col-count">{col.length}</div>
+            </div>
+            {col.length === 0 ? (
+              <div className="empty"><div className="empty-text">Vazio</div></div>
+            ) : (
+              col.map(t => <TaskCard key={t.ID} task={t} onClick={onCardClick} />)
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ListView({ tasks, onCardClick }) {
+  return (
+    <div className="list-view">
+      <div className="list-header">
+        <div>Tarefa</div>
+        <div>Projeto</div>
+        <div>Status</div>
+        <div>Prazo</div>
+        <div>Prioridade</div>
+      </div>
+      {tasks.length === 0 ? (
+        <div className="empty"><div className="empty-icon">📭</div><div className="empty-text">Nenhuma tarefa encontrada</div></div>
+      ) : tasks.map(t => {
+        const overdue = isOverdue(t);
+        const today = isToday(t);
+        return (
+          <div key={t.ID} className={`list-row ${overdue ? 'overdue' : ''}`} onClick={() => onCardClick(t)}>
+            <div style={{fontWeight:500}}>{t.Nome}</div>
+            <div style={{color:'var(--text-dim)', fontSize:'12px'}}>{t.Projeto || '—'}</div>
+            <div><StatusBadge status={t.Status} /></div>
+            <div className={`card-date ${overdue?'overdue':today?'today':''}`} style={{fontSize:'12px'}}>
+              {overdue?'⚠ ':today?'● ':''}{formatDate(t.Data)}
+            </div>
+            <div><PriorityBadge priority={t.Prioridade} /></div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TaskDetail({ task, onClose, onEdit, onDelete }) {
+  const subtasks = parseSubtasks(task.Subtarefas);
+  return (
+    <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <div className="modal-title">{task.Nome}</div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+
+        <div className="detail-grid">
+          <div className="detail-field">
+            <div className="detail-label">Status</div>
+            <StatusBadge status={task.Status} />
+          </div>
+          <div className="detail-field">
+            <div className="detail-label">Prioridade</div>
+            <PriorityBadge priority={task.Prioridade} />
+          </div>
+          <div className="detail-field">
+            <div className="detail-label">Prazo</div>
+            <div className={`detail-value ${isOverdue(task)?'card-date overdue':isToday(task)?'card-date today':''}`}>
+              {isOverdue(task)?'⚠ ':isToday(task)?'● ':''}{formatDate(task.Data)}
+            </div>
+          </div>
+          <div className="detail-field">
+            <div className="detail-label">Projeto</div>
+            <div className="detail-value">{task.Projeto || '—'}</div>
+          </div>
+          {task.Categoria && (
+            <div className="detail-field">
+              <div className="detail-label">Categoria</div>
+              <div className="detail-value">{task.Categoria}</div>
+            </div>
+          )}
+          {task.Tipo && (
+            <div className="detail-field">
+              <div className="detail-label">Tipo</div>
+              <div className="detail-value">{task.Tipo}</div>
+            </div>
+          )}
+        </div>
+
+        {subtasks.length > 0 && (
+          <div className="detail-field" style={{marginTop:'20px'}}>
+            <div className="detail-label">Subtarefas</div>
+            <div className="subtasks-list">
+              {subtasks.map((s, i) => (
+                <div key={i} className={`subtask-item ${s.done ? 'done' : ''}`}>
+                  <span className={s.done ? 'check-icon' : 'uncheck-icon'}>{s.done ? '✓' : '○'}</span>
+                  {s.nome}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {task['Link Notion'] && (
+          <div className="detail-field" style={{marginTop:'16px'}}>
+            <div className="detail-label">Notion</div>
+            <a href={task['Link Notion']} target="_blank" rel="noopener" className="notion-link">
+              Abrir no Notion →
+            </a>
+          </div>
+        )}
+
+        <div className="modal-actions">
+          <button className="btn btn-danger" onClick={() => onDelete(task)}>Remover</button>
+          <button className="btn btn-ghost" onClick={onClose}>Fechar</button>
+          <button className="btn btn-primary" onClick={() => onEdit(task)}>Editar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TaskForm({ task, onClose, onSave }) {
+  const [form, setForm] = useState({
+    Nome: task?.Nome || '',
+    Projeto: task?.Projeto || '',
+    Status: task?.Status || 'To Do',
+    Prioridade: task?.Prioridade || '🟡 Importante',
+    Tipo: task?.Tipo || 'Execução',
+    Categoria: task?.Categoria || 'Receita',
+    Data: task?.Data || '',
+    Subtarefas: task?.Subtarefas || '',
+    'Link Notion': task?.['Link Notion'] || '',
+  });
+
+  const set = (k, v) => setForm(f => ({...f, [k]: v}));
+
+  return (
+    <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <div className="modal-title">{task ? 'Editar Tarefa' : 'Nova Tarefa'}</div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="form-grid">
+          <div className="form-group">
+            <label className="form-label">Nome da tarefa *</label>
+            <input className="form-input" value={form.Nome} onChange={e => set('Nome', e.target.value)} placeholder="Ex: Fechar proposta BRPark" />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Projeto</label>
+              <input className="form-input" value={form.Projeto} onChange={e => set('Projeto', e.target.value)} placeholder="Ex: BRPark" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Prazo</label>
+              <input className="form-input" type="date" value={form.Data} onChange={e => set('Data', e.target.value)} />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Status</label>
+              <select className="form-select" value={form.Status} onChange={e => set('Status', e.target.value)}>
+                {STATUS_ORDER.map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Prioridade</label>
+              <select className="form-select" value={form.Prioridade} onChange={e => set('Prioridade', e.target.value)}>
+                <option>🔴 Crítico</option>
+                <option>🟡 Importante</option>
+                <option>⚪ Normal</option>
+              </select>
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Tipo</label>
+              <select className="form-select" value={form.Tipo} onChange={e => set('Tipo', e.target.value)}>
+                {['Execução','Follow-up','Decisão','Reunião','Estratégia'].map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Categoria</label>
+              <select className="form-select" value={form.Categoria} onChange={e => set('Categoria', e.target.value)}>
+                {['Receita','Estratégia','Produto','Pessoas/Pessoal','Financeiro'].map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Subtarefas <span style={{fontSize:'10px', fontWeight:400, color:'var(--text-muted)'}}>formato: Nome|☐, Nome|✅</span></label>
+            <input className="form-input" value={form.Subtarefas} onChange={e => set('Subtarefas', e.target.value)} placeholder="Ex: Redigir proposta|☐,Enviar|✅" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Link Notion</label>
+            <input className="form-input" value={form['Link Notion']} onChange={e => set('Link Notion', e.target.value)} placeholder="https://notion.so/..." />
+          </div>
+        </div>
+        <div className="modal-actions">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary" onClick={() => onSave({ ...task, ...form })}>
+            {task ? 'Salvar' : 'Criar Tarefa'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// APP PRINCIPAL
+// ============================================================
+function App() {
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('kanban'); // kanban | list
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [creating, setCreating] = useState(false);
+  const [toasts, setToasts] = useState([]);
+
+  const toast = (msg, type='success') => {
+    const id = Date.now();
+    setToasts(t => [...t, { id, msg, type }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
+  };
+
+  // Carrega dados
+  const loadTasks = useCallback(async () => {
+    setLoading(true);
+    try {
+      if (isDemo) {
+        setTasks(DEMO_DATA);
+      } else {
+        const res = await apiCall('list');
+        if (res?.tasks) setTasks(res.tasks);
+      }
+    } catch (e) {
+      toast('Erro ao carregar tarefas', 'error');
+      setTasks(DEMO_DATA);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadTasks(); }, [loadTasks]);
+
+  // Filtragem
+  const filtered = tasks.filter(t => {
+    if (filter === 'overdue') return isOverdue(t);
+    if (filter === 'today')   return isToday(t);
+    if (filter !== 'all')     return t.Status === filter;
+    return true;
+  }).filter(t => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return t.Nome?.toLowerCase().includes(q) || t.Projeto?.toLowerCase().includes(q);
+  });
+
+  // Stats
+  const stats = {
+    abertas: tasks.filter(t => ['To Do','Doing'].includes(t.Status)).length,
+    atrasadas: tasks.filter(isOverdue).length,
+    doing: tasks.filter(t => t.Status === 'Doing').length,
+  };
+
+  // Handlers
+  const handleSave = async (data) => {
+    if (isDemo) {
+      if (data.ID && data.ID.startsWith('demo')) {
+        setTasks(ts => ts.map(t => t.ID === data.ID ? data : t));
+        toast('Tarefa atualizada (modo demo)');
+      } else if (!data.ID) {
+        const novo = { ...data, ID: 'demo_' + Date.now() };
+        setTasks(ts => [novo, ...ts]);
+        toast('Tarefa criada (modo demo)');
+      }
+    } else {
+      try {
+        if (data.ID) {
+          await apiCall('update', {}, data);
+          toast('Tarefa atualizada ✓');
+        } else {
+          await apiCall('create', {}, data);
+          toast('Tarefa criada ✓');
+        }
+        await loadTasks();
+      } catch (e) { toast('Erro ao salvar', 'error'); }
+    }
+    setEditing(null); setCreating(false); setSelected(null);
+  };
+
+  const handleDelete = async (task) => {
+    if (!confirm(`Remover "${task.Nome}"?`)) return;
+    if (isDemo) {
+      setTasks(ts => ts.filter(t => t.ID !== task.ID));
+      toast('Removida (modo demo)');
+    } else {
+      try {
+        await apiCall('delete', {}, { id: task.ID });
+        toast('Tarefa removida');
+        await loadTasks();
+      } catch (e) { toast('Erro ao remover', 'error'); }
+    }
+    setSelected(null);
+  };
+
+  return (
+    <div className="app">
+      {/* HEADER */}
+      <header className="header">
+        <div className="logo">
+          <div className="logo-dot" />
+          Seven C
+        </div>
+        <span style={{color:'var(--text-muted)', fontSize:'12px', fontWeight:500}}>Task Manager</span>
+        <div className="header-stats">
+          <div className="stat-chip">Abertas <span>{stats.abertas}</span></div>
+          <div className="stat-chip">Em andamento <span>{stats.doing}</span></div>
+          <div className="stat-chip overdue">Atrasadas <span>{stats.atrasadas}</span></div>
+        </div>
+        {isDemo && <span style={{fontSize:'11px', background:'rgba(255,92,53,0.1)', color:'var(--accent)', padding:'4px 10px', borderRadius:'99px', border:'1px solid rgba(255,92,53,0.2)'}}>modo demo</span>}
+      </header>
+
+      {/* TOOLBAR */}
+      <div className="toolbar">
+        <input
+          className="search-input"
+          placeholder="Buscar tarefa ou projeto..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        <div className="filter-pills">
+          {[
+            ['all','Todas'],
+            ['To Do','To Do','todo'],
+            ['Doing','Doing','doing'],
+            ['StandBy','Stand By','standby'],
+            ['Done','Done','done'],
+            ['overdue','⚠ Atrasadas','overdue'],
+            ['today','● Hoje',''],
+          ].map(([val, label, cls]) => (
+            <button key={val} className={`pill ${cls||''} ${filter===val?'active':''}`} onClick={() => setFilter(val)}>{label}</button>
+          ))}
+        </div>
+        <div className="view-toggle">
+          <button className={`view-btn ${view==='kanban'?'active':''}`} onClick={() => setView('kanban')}>⊞</button>
+          <button className={`view-btn ${view==='list'?'active':''}`} onClick={() => setView('list')}>☰</button>
+        </div>
+        <button className="btn btn-primary" onClick={() => setCreating(true)}>+ Nova</button>
+      </div>
+
+      {/* MAIN */}
+      <main className="main">
+        {isDemo && (
+          <div className="config-banner">
+            <span>⚙</span>
+            <span>
+              <strong>Modo Demo</strong> — Configure a URL do Apps Script em <code>API_CONFIG.url</code> no <code>index.html</code> para conectar ao Google Sheets real.
+            </span>
+          </div>
+        )}
+        {loading ? (
+          <div className="loading"><div className="spinner" /></div>
+        ) : view === 'kanban' ? (
+          <KanbanView tasks={filtered} onCardClick={setSelected} />
+        ) : (
+          <ListView tasks={filtered} onCardClick={setSelected} />
+        )}
+      </main>
+
+      {/* MODALS */}
+      {selected && !editing && (
+        <TaskDetail
+          task={selected}
+          onClose={() => setSelected(null)}
+          onEdit={t => { setEditing(t); setSelected(null); }}
+          onDelete={handleDelete}
+        />
+      )}
+      {(editing || creating) && (
+        <TaskForm
+          task={editing}
+          onClose={() => { setEditing(null); setCreating(false); }}
+          onSave={handleSave}
+        />
+      )}
+
+      <Toast toasts={toasts} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
